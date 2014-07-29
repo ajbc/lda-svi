@@ -19,6 +19,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import cPickle, string, numpy, getopt, sys, random, time, re, pprint
+from os.path import join
 
 import onlineldavb
 import generalrandom
@@ -74,8 +75,9 @@ def fit_olda_liveparse(doc_path, vocab_file, outdir, K, batch_size, iterations):
         # distributions over topic weights for the articles analyzed in
         # the last iteration.
         if (iteration % 10 == 0):
-            numpy.savetxt('lambda-%d.dat' % iteration, olda._lambda)
-            numpy.savetxt('gamma-%d.dat' % iteration, gamma)
+            numpy.savetxt(join(outdir, 'lambda-%d.dat' % iteration), \
+                olda._lambda)
+            numpy.savetxt(join(outdir, 'gamma-%d.dat' % iteration), gamma)
             print_topics(K, 7, vocab, olda._lambda)
 
 
@@ -127,15 +129,16 @@ def fit_olda_preparse(doc_file, vocab_file, outdir, K, batch_size, iterations):
         # the last iteration.
         if (iteration % 10 == 0):
             #TODO: add outdir
-            numpy.savetxt('lambda-%d.dat' % iteration, olda._lambda)
-            numpy.savetxt('gamma-%d.dat' % iteration, gamma)
+            numpy.savetxt(join(outdir, 'lambda-%d.dat' % iteration), \
+                olda._lambda)
+            numpy.savetxt(join(outdir, 'gamma-%d.dat' % iteration), gamma)
             print_topics(K, 7, vocab, olda._lambda, f)
         iteration += 1
     f.close()
     
     # save final iters
-    numpy.savetxt('lambda-%d.dat' % iteration, olda._lambda)
-    numpy.savetxt('gamma-%d.dat' % iteration, gamma)
+    numpy.savetxt(join(outdir, 'lambda-%d.dat' % iteration), olda._lambda)
+    numpy.savetxt(join(outdir, 'gamma-%d.dat' % iteration), gamma)
 
 
 if __name__ == '__main__':
