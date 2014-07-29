@@ -1,9 +1,16 @@
 ONLINE VARIATIONAL BAYES FOR LATENT DIRICHLET ALLOCATION
 
+
+Allison J.B. Chaney
+achaney@cs.princeton.edu
+
+This code is branched from source originally created by
 Matthew D. Hoffman
 mdhoffma@cs.princeton.edu
 
 (C) Copyright 2010, Matthew D. Hoffman
+Modifications (C) Copyright 2014, Allison J. B. Chaney
+
 
 This is free software, you can redistribute it and/or modify it under
 the terms of the GNU General Public License.
