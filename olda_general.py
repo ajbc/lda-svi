@@ -89,7 +89,6 @@ def fit_olda_preparse(doc_file, vocab_file, outdir, K, batch_size, iterations,\
     """
     Analyzes a set of documents using online VB for LDA.
     """
-    print batch_size, " ia the bathc_sze"
     
     # instance to get random documents
     docgen = generalrandom.PreparseDocGen(doc_file)

@@ -21,7 +21,7 @@ from bs4 import BeautifulSoup
 
 class LiveparseDocGen():
     def __init__(self, path):
-        print "initialiing live parse doc gen with path " + path
+        print "initializing live parse doc gen with path " + path
 
         self.doclist = []
         for (root,dirnames,filenames) in os.walk(path):
@@ -59,7 +59,7 @@ class LiveparseDocGen():
 
 class PreparseDocGen():
     def __init__(self, filename):
-        print "initialiing preparsed doc gen with file " + filename
+        print "initializing preparsed doc gen with file " + filename
         lines = open(filename).readlines()
         self.docs = []
         for line in lines:
