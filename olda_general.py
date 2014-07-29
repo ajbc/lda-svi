@@ -103,7 +103,7 @@ def fit_olda_preparse(doc_file, vocab_file, outdir, K, batch_size, iterations):
     old_perplexity = 1.0 * sys.maxint
     delta_perplexity = 1.0 * sys.maxint
     old_perplexities = [old_perplexity] * 10
-    f = open('lda.out', 'w+')
+    logfile = open(join(outdir, 'log.out'), 'w+')
     while (iterations != 0 and iteration < iterations) or \
         sum(old_perplexities)/10 > 0.0001: # 0.1% change in sample perplexity
         # Download some articles
@@ -117,7 +117,7 @@ def fit_olda_preparse(doc_file, vocab_file, outdir, K, batch_size, iterations):
         delta_perplexity = abs(old_perplexity - perplexity) / perplexity
         print '%d:  rho_t = %f,  held-out perplexity estimate = %f (%.2f%%)' % \
             (iteration, olda._rhot, perplexity, delta_perplexity * 100)
-        f.write('%d:  rho_t = %f,  held-out perplexity estimate = %f (%.2f%%)\n' % (iteration, olda._rhot, perplexity, delta_perplexity * 100))
+        logfile.write('%d:  rho_t = %f,  held-out perplexity estimate = %f (%.2f%%)\n' % (iteration, olda._rhot, perplexity, delta_perplexity * 100))
         old_perplexity = perplexity
         old_perplexities.pop(0)
         old_perplexities.append(old_perplexity)
@@ -132,7 +132,7 @@ def fit_olda_preparse(doc_file, vocab_file, outdir, K, batch_size, iterations):
             numpy.savetxt(join(outdir, 'lambda-%d.dat' % iteration), \
                 olda._lambda)
             numpy.savetxt(join(outdir, 'gamma-%d.dat' % iteration), gamma)
-            print_topics(K, 7, vocab, olda._lambda, f)
+            print_topics(K, 7, vocab, olda._lambda, logfile)
         iteration += 1
     f.close()
     
