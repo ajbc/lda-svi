@@ -19,7 +19,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import cPickle, string, numpy, getopt, sys, random, time, re, pprint
-from os.path import join
+from os.path import join, exists
+from os import makedirs
 
 import onlineldavb
 import generalrandom
@@ -35,7 +36,8 @@ def print_topics(num_topics, num_terms, vocab, lambdas, f=None):
         if f:
             f.write('    topic %d: %s\n' % (k, terms))
 
-def fit_olda_liveparse(doc_path, vocab_file, outdir, K, batch_size, iterations):
+def fit_olda_liveparse(doc_path, vocab_file, outdir, K, batch_size, iterations,\
+    verbose_topics):
     """
     Analyzes a set of documents using online VB for LDA.
     """
@@ -78,10 +80,12 @@ def fit_olda_liveparse(doc_path, vocab_file, outdir, K, batch_size, iterations):
             numpy.savetxt(join(outdir, 'lambda-%d.dat' % iteration), \
                 olda._lambda)
             numpy.savetxt(join(outdir, 'gamma-%d.dat' % iteration), gamma)
-            print_topics(K, 7, vocab, olda._lambda)
+            if verbose_topics:
+                print_topics(K, 7, vocab, olda._lambda)
 
 
-def fit_olda_preparse(doc_file, vocab_file, outdir, K, batch_size, iterations):
+def fit_olda_preparse(doc_file, vocab_file, outdir, K, batch_size, iterations,\
+    verbose_topics):
     """
     Analyzes a set of documents using online VB for LDA.
     """
@@ -132,7 +136,8 @@ def fit_olda_preparse(doc_file, vocab_file, outdir, K, batch_size, iterations):
             numpy.savetxt(join(outdir, 'lambda-%d.dat' % iteration), \
                 olda._lambda)
             numpy.savetxt(join(outdir, 'gamma-%d.dat' % iteration), gamma)
-            print_topics(K, 7, vocab, olda._lambda, logfile)
+            if verbose_topics:
+                print_topics(K, 7, vocab, olda._lambda, logfile)
         iteration += 1
     f.close()
     
@@ -155,6 +160,8 @@ if __name__ == '__main__':
         default=1000, help = 'batch size (# of random docs per iteration), default 1000')
     parser.add_argument('--iterations', metavar='iterations', type=int, \
         default=0, help = 'number of iterations; default # doc / batch size')
+    parser.add_argument('--vocab', metavar='vocab', type=str, \
+        default='', help = 'input vocabulary file')
     
 
     # Two methods of obtaining the corpus
@@ -162,22 +169,31 @@ if __name__ == '__main__':
     # option A: parse into vocab tokens on the fly
     group.add_argument('--doc_path', metavar='doc_path', type=str, \
         default='', help='a path to a corpus, one doc per file')
-    parser.add_argument('--vocab', metavar='vocab', type=str, \
-        default='', help = 'input vocabulary file')
     
     # option B: read pre-processed wordcounts
     group.add_argument('--doc_file', metavar='doc_file', type=str, \
         default='', help='a corpus in a single file, one doc per line')
+    
+    
+    # verbosity / printing arguments
+    parser.add_argument('--print-topics', dest='print_topics', \
+        action='store_true', help='print topic terms every 10 iterations')
+    parser.add_argument('--no-print-topics', dest='print_topics', \
+        action='store_false', help='default; don\'t print topic terms')
+    parser.set_defaults(feature=False)
+    
 
     args = parser.parse_args()
     if args.doc_path != '' and args.vocab is '':
         parser.error("--doc_path requires --vocab.")
+    if args.out != '' and not exists(args.out):
+        makedirs(args.out) 
 
     if args.doc_file == '':
         # option A
         fit_olda_liveparse(args.doc_path, args.vocab, args.out, \
-            args.K, args.batch_size, args.iterations)
+            args.K, args.batch_size, args.iterations, args.print_topics)
     else:
         # option B
         fit_olda_preparse(args.doc_file, args.vocab, args.out, \
-            args.K, args.batch_size, args.iterations)
+            args.K, args.batch_size, args.iterations, args.print_topics)
