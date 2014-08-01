@@ -21,23 +21,30 @@
 import cPickle, string, numpy, getopt, sys, random, time, re, pprint
 from os.path import join, exists
 from os import makedirs
+import numpy as np
 
 import onlineldavb
 import generalrandom
 
-def print_topics(num_topics, num_terms, vocab, lambdas, f=None):
+def print_topics(num_topics, num_terms, vocab, lambdas, anchors, f=None):
     for k in range(0, num_topics):
-        lambdak = list(lambdas[k, :])
+        lambdak = lambdas[k, :]
         lambdak = lambdak / sum(lambdak)
+        lambdak = np.array(lambdak)
+        lambdak[lambdak==np.inf] = 0
+        lambdak = list(lambdak)
         temp = zip(lambdak, range(0, len(lambdak)))
         temp = sorted(temp, key = lambda x: x[0], reverse=True)
-        terms = ' '.join([vocab[temp[i][1]] for i in range(num_terms)])
+        term = lambda i: vocab[temp[i][1]] + ('*' if len(anchors) > k and \
+            vocab[temp[i][1]] in anchors[k] else '')
+        terms = ' '.join([term(i) for i in range(num_terms)])
         print '    topic %d: %s' % (k, terms)
         if f:
             f.write('    topic %d: %s\n' % (k, terms))
 
+
 def fit_olda_liveparse(doc_path, vocab_file, outdir, K, batch_size, iterations,\
-    verbose_topics):
+    verbose_topics, anchors):
     """
     Analyzes a set of documents using online VB for LDA.
     """
@@ -55,9 +62,10 @@ def fit_olda_liveparse(doc_path, vocab_file, outdir, K, batch_size, iterations,\
     # Our vocabulary
     vocab = [term.strip() for term in file(vocab_file).readlines()]
     W = len(vocab)
+    
 
     # Initialize the algorithm with alpha=1/K, eta=1/K, tau_0=1024, kappa=0.7
-    olda = onlineldavb.OnlineLDA(vocab, K, D, 1./K, 1./K, 1024., 0.7)
+    olda = onlineldavb.OnlineLDA(vocab, K, D, 1./K, 1./K, 1024., 0.7, anchors)
     # Run until we've seen D documents. (Feel free to interrupt *much*
     # sooner than this.)
     for iteration in range(0, iterations):
@@ -81,11 +89,11 @@ def fit_olda_liveparse(doc_path, vocab_file, outdir, K, batch_size, iterations,\
                 olda._lambda)
             numpy.savetxt(join(outdir, 'gamma-%d.dat' % iteration), gamma)
             if verbose_topics:
-                print_topics(K, 7, vocab, olda._lambda)
+                print_topics(K, 7, vocab, olda._lambda, anchors)
 
 
 def fit_olda_preparse(doc_file, vocab_file, outdir, K, batch_size, iterations,\
-    verbose_topics):
+    verbose_topics, anchors):
     """
     Analyzes a set of documents using online VB for LDA.
     """
@@ -98,7 +106,8 @@ def fit_olda_preparse(doc_file, vocab_file, outdir, K, batch_size, iterations,\
     vocab = [line.strip() for line in open(args.vocab).readlines()]
 
     # Initialize the algorithm with alpha=1/K, eta=1/K, tau_0=1024, kappa=0.7
-    olda = onlineldavb.OnlineLDA(len(vocab), K, D, 1./K, 1./K, 1024., 0.7)
+    olda = onlineldavb.OnlineLDA(vocab, K, D, 1./K, 1./K, 1024., 0.7, anchors, \
+        preparsed = True)
     # Run until we've seen D documents. (Feel free to interrupt *much*
     # sooner than this.)
 
@@ -136,9 +145,9 @@ def fit_olda_preparse(doc_file, vocab_file, outdir, K, batch_size, iterations,\
                 olda._lambda)
             numpy.savetxt(join(outdir, 'gamma-%d.dat' % iteration), gamma)
             if verbose_topics:
-                print_topics(K, 7, vocab, olda._lambda, logfile)
+                print_topics(K, 7, vocab, olda._lambda, anchors, logfile)
         iteration += 1
-    f.close()
+    logfile.close()
     
     # save final iters
     numpy.savetxt(join(outdir, 'lambda-%d.dat' % iteration), olda._lambda)
@@ -180,19 +189,38 @@ if __name__ == '__main__':
     parser.add_argument('--no-print-topics', dest='print_topics', \
         action='store_false', help='default; don\'t print topic terms')
     parser.set_defaults(feature=False)
+
+
+    # extensions of LDA
+    parser.add_argument('--anchors', metavar='anchors', type=str, \
+        default='', help = 'anchor words file, one topic per line, terms separated by commas')
+
     
 
     args = parser.parse_args()
     if args.doc_path != '' and args.vocab is '':
         parser.error("--doc_path requires --vocab.")
+    if args.anchors != '' and args.vocab is '':
+        parser.error("--anchors requires --vocab.")
     if args.out != '' and not exists(args.out):
         makedirs(args.out) 
+    
+    # anchor words, if applicable
+    anchors = []
+    if args.anchors != '':
+        anchors = [set([term.strip() for term in line.split(',')]) \
+            for line in file(args.anchors).readlines()]
+        if len(anchors) > args.K:
+            raise Exception("K < # of anchored topics")
 
+    # run the fits
     if args.doc_file == '':
         # option A
         fit_olda_liveparse(args.doc_path, args.vocab, args.out, \
-            args.K, args.batch_size, args.iterations, args.print_topics)
+            args.K, args.batch_size, args.iterations, args.print_topics, \
+            anchors)
     else:
         # option B
         fit_olda_preparse(args.doc_file, args.vocab, args.out, \
-            args.K, args.batch_size, args.iterations, args.print_topics)
+            args.K, args.batch_size, args.iterations, args.print_topics, \
+            anchors)

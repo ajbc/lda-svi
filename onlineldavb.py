@@ -20,6 +20,9 @@ import sys, re, time, string
 import numpy as n
 from scipy.special import gammaln, psi
 
+import warnings
+warnings.filterwarnings('error')
+
 n.random.seed(100000001)
 meanchangethresh = 0.001
 
@@ -90,7 +93,8 @@ class OnlineLDA:
     Implements online VB for LDA as described in (Hoffman et al. 2010).
     """
 
-    def __init__(self, vocab, K, D, alpha, eta, tau0, kappa):
+    def __init__(self, vocab, K, D, alpha, eta, tau0, kappa, anchors=[], \
+        preparsed=False):
         """
         Arguments:
         K: Number of topics
@@ -109,8 +113,11 @@ class OnlineLDA:
         Note that if you pass the same set of D documents in every time and
         set kappa=0 this class can also be used to do batch VB.
         """
-        if type(vocab).__name__ == 'int':
-            self._W = vocab
+        if preparsed:
+            self._W = len(vocab)
+            self._vocab = dict()
+            for term in vocab:
+                self._vocab[term] = len(self._vocab)
         else:
             self._vocab = dict()
             for word in vocab:
@@ -129,8 +136,29 @@ class OnlineLDA:
 
         # Initialize the variational distribution q(beta|lambda)
         self._lambda = 1*n.random.gamma(100., 1./100., (self._K, self._W))
+
+        # an interlude in initialization to anchor lambda
+        self._anchors = anchors
+        if self._anchors != []:
+            self.reanchor_lambda(init=True)
+        
+        # back to initializing the variational distribution
         self._Elogbeta = dirichlet_expectation(self._lambda)
         self._expElogbeta = n.exp(self._Elogbeta)
+        self._expElogbeta[self._Elogbeta == n.inf] = 0
+ 
+    def reanchor_lambda(self, init=False):
+        topic_counter = 0
+        for anchor in self._anchors:
+            for term in anchor:
+                if term not in self._vocab:
+                    if init:
+                        print term, "not in vocabulary; omitting this anchor"
+                    continue
+                for topic in range(self._K):
+                    if topic != topic_counter:
+                        self._lambda[topic, self._vocab[term]] = 0.0
+            topic_counter += 1
 
     def do_e_step(self, docs):
         """
@@ -238,14 +266,20 @@ class OnlineLDA:
         # we need to update lambda.
         (gamma, sstats) = self.do_e_step(docs)
         # Estimate held-out likelihood for current values of lambda.
+        #TODO: figure out what is meant by "held-out" here? (docs used to train)
         bound = self.approx_bound(docs, gamma)
         # Update lambda based on documents.
         self._lambda = self._lambda * (1-rhot) + \
             rhot * (self._eta + self._D * sstats / len(docs))
+        
+        if self._anchors != []:
+            self.reanchor_lambda()
+        
         self._Elogbeta = dirichlet_expectation(self._lambda)
         self._expElogbeta = n.exp(self._Elogbeta)
+        self._expElogbeta[self._Elogbeta == n.inf] = 0
         self._updatect += 1
-
+        
         return(gamma, bound)
 
     def approx_bound(self, docs, gamma):
@@ -284,9 +318,17 @@ class OnlineLDA:
             cts = n.array(wordcts[d])
             phinorm = n.zeros(len(ids))
             for i in range(0, len(ids)):
-                temp = Elogtheta[d, :] + self._Elogbeta[:, ids[i]]
-                tmax = max(temp)
-                phinorm[i] = n.log(sum(n.exp(temp - tmax))) + tmax
+                try:
+                    temp = Elogtheta[d, :] + self._Elogbeta[:, ids[i]]
+                    tmax = max(temp)
+                    phinorm[i] = n.log(sum(n.exp(temp - tmax))) + tmax
+                except:
+                    # if there's an warning exception raised, it's due to
+                    # archored values not playing nice 
+                    temp[self._Elogbeta[:,ids[i]] == n.inf] = 0
+                    tmax = max(temp)
+                    phinorm[i] = n.log(sum(n.exp(temp - tmax))) + tmax
+
             score += n.sum(cts * phinorm)
 #             oldphinorm = phinorm
 #             phinorm = n.dot(expElogtheta[d, :], self._expElogbeta[:, ids])
@@ -303,9 +345,12 @@ class OnlineLDA:
         score = score * self._D / len(docs)
 
         # E[log p(beta | eta) - log q (beta | lambda)]
-        score = score + n.sum((self._eta-self._lambda)*self._Elogbeta)
-        score = score + n.sum(gammaln(self._lambda) - gammaln(self._eta))
-        score = score + n.sum(gammaln(self._eta*self._W) - 
-                              gammaln(n.sum(self._lambda, 1)))
+        self._Elogbeta[self._Elogbeta == n.inf] = 0
+        score += n.sum((self._eta-self._lambda)*self._Elogbeta)
+        gammaln_lambda = gammaln(self._lambda)
+        gammaln_lambda[gammaln_lambda == n.inf] = 0
+        score += n.sum(gammaln_lambda - gammaln(self._eta))
+        score += n.sum(gammaln(self._eta*self._W) - \
+            gammaln(n.sum(self._lambda, 1)))
 
         return(score)
