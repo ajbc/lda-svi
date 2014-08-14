@@ -34,9 +34,9 @@ dc = 0
 for (root,dirnames,filenames) in os.walk(args.doc_path):
     for filename in fnmatch.filter(filenames, '*'):
         docfile = os.path.join(root,filename)
-    
+
         xml = open(docfile, 'r')
-        soup = BeautifulSoup(xml) 
+        soup = BeautifulSoup(xml)
         xml.close()
 
         # find all the text
@@ -63,12 +63,12 @@ for (root,dirnames,filenames) in os.walk(args.doc_path):
                 found.add(word)
             tf[word] += 1
         dc += 1
- 
+
 fout = open(args.out, 'w+')
 for word in tf:
     tfidf = tf[word] * np.log(dc * 1.0 / df[word])
     if df[word] > args.min_doc_count and \
-        df[word]*1.0 / dc <= args.max_doc_per and \
+        df[word]*100.0 / dc <= args.max_doc_per and \
         tfidf > args.min_tfidf:
         fout.write(word + '\n')
 fout.close()
