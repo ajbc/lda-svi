@@ -44,41 +44,62 @@ def print_topics(num_topics, num_terms, vocab, lambdas, anchors, f=None):
 
 
 def fit_olda_liveparse(doc_path, vocab_file, outdir, K, batch_size, iterations,\
-    verbose_topics, anchors):
+    verbose_topics, anchors, tmv_pickle, lemmatize):
     """
     Analyzes a set of documents using online VB for LDA.
     """
-    
     # instance to get random documents
     docgen = generalrandom.LiveparseDocGen(doc_path)
 
     # The total number of documents in Wikipedia
     D = docgen.getDocCount()
 
-    # define number of iterations; TODO: add a better convergence check
-    if iterations == 0:
-        iterations = int(D/batch_size)
-
     # Our vocabulary
     vocab = [term.strip() for term in file(vocab_file).readlines()]
     W = len(vocab)
-    
+
+    # write out general settings to pickle file for use by TMV later
+    if tmv_pickle:
+        # save model settings: vocab, K, docgen
+        f = open(join(outdir, 'settings.pickle'), 'w+')
+        cPickle.dump((vocab, K, docgen), f)
+        f.close()
+
 
     # Initialize the algorithm with alpha=1/K, eta=1/K, tau_0=1024, kappa=0.7
-    olda = onlineldavb.OnlineLDA(vocab, K, D, 1./K, 1./K, 1024., 0.7, anchors)
+    olda = onlineldavb.OnlineLDA(vocab, K, D, 1./K, 1./K, 1024., 0.7, anchors, \
+        lem = lemmatize)
     # Run until we've seen D documents. (Feel free to interrupt *much*
     # sooner than this.)
-    for iteration in range(0, iterations):
+    iteration = 0
+    old_perplexity = 1.0 * sys.maxint
+    delta_perplexity = 1.0 * sys.maxint
+    old_perplexities = [old_perplexity] * 10
+    logfile = open(join(outdir, 'log.out'), 'w+')
+    while (iterations != 0 and iteration < iterations) or \
+        sum(old_perplexities)/10 > 0.0001: # 0.1% change in sample perplexity
+
+        iter_start = time.time()
         # Download some articles
-        (docset, articlenames) = \
-            docgen.get_random_articles(batch_size)
+        docset = docgen.get_random_articles(batch_size)
+
         # Give them to online LDA
         (gamma, bound) = olda.update_lambda(docset)
+
         # Compute an estimate of held-out perplexity
-        (wordids, wordcts) = onlineldavb.parse_doc_list(docset, olda._vocab)
+        (wordids, wordcts) = onlineldavb.parse_doc_list(docset, olda._vocab, \
+            lemmatize)
+
+        # estimate perpexity with the current batch
         perwordbound = bound * len(docset) / (D * sum(map(sum, wordcts)))
-        print '%d:  rho_t = %f,  held-out perplexity estimate = %f' % \
-            (iteration, olda._rhot, numpy.exp(-perwordbound))
+        perplexity = numpy.exp(-perwordbound)
+        delta_perplexity = abs(old_perplexity - perplexity) / perplexity
+        print '%d:  rho_t = %f,  held-out perplexity estimate = %f (%.2f%%)' % \
+            (iteration, olda._rhot, perplexity, delta_perplexity * 100)
+        logfile.write('%d:  rho_t = %f,  held-out perplexity estimate = %f (%.2f%%)\n' % (iteration, olda._rhot, perplexity, delta_perplexity * 100))
+        old_perplexity = perplexity
+        old_perplexities.pop(0)
+        old_perplexities.append(perplexity)
 
         # Save lambda, the parameters to the variational distributions
         # over topics, and gamma, the parameters to the variational
@@ -88,8 +109,19 @@ def fit_olda_liveparse(doc_path, vocab_file, outdir, K, batch_size, iterations,\
             numpy.savetxt(join(outdir, 'lambda-%d.dat' % iteration), \
                 olda._lambda)
             numpy.savetxt(join(outdir, 'gamma-%d.dat' % iteration), gamma)
+
+
             if verbose_topics:
                 print_topics(K, 7, vocab, olda._lambda, anchors)
+
+
+        iteration += 1
+
+    if tmv_pickle:
+        f = open(join(outdir,'olda.pickle'), 'w+')
+        cPickle.dump(olda, f)
+        f.close()
+
 
 
 def fit_olda_preparse(doc_file, vocab_file, outdir, K, batch_size, iterations,\
@@ -97,7 +129,7 @@ def fit_olda_preparse(doc_file, vocab_file, outdir, K, batch_size, iterations,\
     """
     Analyzes a set of documents using online VB for LDA.
     """
-    
+
     # instance to get random documents
     docgen = generalrandom.PreparseDocGen(doc_file)
 
@@ -148,7 +180,7 @@ def fit_olda_preparse(doc_file, vocab_file, outdir, K, batch_size, iterations,\
                 print_topics(K, 7, vocab, olda._lambda, anchors, logfile)
         iteration += 1
     logfile.close()
-    
+
     # save final iters
     numpy.savetxt(join(outdir, 'lambda-%d.dat' % iteration), olda._lambda)
     numpy.savetxt(join(outdir, 'gamma-%d.dat' % iteration), gamma)
@@ -159,9 +191,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description = \
         'Fit LDA to a set of documents with online VB.')
-    
-    parser.add_argument('--out', metavar='outdir', type=str, \
-        default='', help = 'output directory')
+
     parser.add_argument('--K', metavar='K', type=int, \
         default=100, help = 'number of LDA components, default 100')
     parser.add_argument('--batch_size', metavar='batch_size', type=int, \
@@ -170,41 +200,49 @@ if __name__ == '__main__':
         default=0, help = 'number of iterations; default # doc / batch size')
     parser.add_argument('--vocab', metavar='vocab', type=str, \
         default='', help = 'input vocabulary file')
-    
+
 
     # Two methods of obtaining the corpus
     group = parser.add_mutually_exclusive_group(required=True)
     # option A: parse into vocab tokens on the fly
     group.add_argument('--doc_path', metavar='doc_path', type=str, \
         default='', help='a path to a corpus, one doc per file')
-    
+
     # option B: read pre-processed wordcounts
     group.add_argument('--doc_file', metavar='doc_file', type=str, \
         default='', help='a corpus in a single file, one doc per line')
-    
-    
+
+
     # verbosity / printing arguments
     parser.add_argument('--print-topics', dest='print_topics', \
         action='store_true', help='print topic terms every 10 iterations')
     parser.add_argument('--no-print-topics', dest='print_topics', \
         action='store_false', help='default; don\'t print topic terms')
-    parser.set_defaults(feature=False)
+    parser.set_defaults(print_topics=False)
+
+    # output arguments
+    parser.add_argument('--out', dest='outdir', type=str, \
+        default='', help = 'output directory')
+    parser.add_argument('--tmv-pickle', dest='tmv_pickle', \
+        action='store_true', help='save pickles for tmv later')
 
 
     # extensions of LDA
     parser.add_argument('--anchors', metavar='anchors', type=str, \
         default='', help = 'anchor words file, one topic per line, terms separated by commas')
+    parser.add_argument('--lemmatize', dest='lemmatize', default=False, \
+        action='store_true', help='Lemmitize vocabulary for live parse.')
 
-    
 
+    # parse the arguments
     args = parser.parse_args()
     if args.doc_path != '' and args.vocab is '':
         parser.error("--doc_path requires --vocab.")
     if args.anchors != '' and args.vocab is '':
         parser.error("--anchors requires --vocab.")
-    if args.out != '' and not exists(args.out):
-        makedirs(args.out) 
-    
+    if args.outdir != '' and not exists(args.outdir):
+        makedirs(args.outdir)
+
     # anchor words, if applicable
     anchors = []
     if args.anchors != '':
@@ -216,11 +254,11 @@ if __name__ == '__main__':
     # run the fits
     if args.doc_file == '':
         # option A
-        fit_olda_liveparse(args.doc_path, args.vocab, args.out, \
+        fit_olda_liveparse(args.doc_path, args.vocab, args.outdir, \
             args.K, args.batch_size, args.iterations, args.print_topics, \
-            anchors)
+            anchors, args.tmv_pickle, args.lemmatize)
     else:
         # option B
-        fit_olda_preparse(args.doc_file, args.vocab, args.out, \
+        fit_olda_preparse(args.doc_file, args.vocab, args.outdir, \
             args.K, args.batch_size, args.iterations, args.print_topics, \
             anchors)

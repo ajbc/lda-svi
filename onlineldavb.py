@@ -23,6 +23,7 @@ from scipy.special import gammaln, psi
 import warnings
 warnings.filterwarnings('error')
 
+
 n.random.seed(100000001)
 meanchangethresh = 0.001
 
@@ -34,19 +35,19 @@ def dirichlet_expectation(alpha):
         return(psi(alpha) - psi(n.sum(alpha)))
     return(psi(alpha) - psi(n.sum(alpha, 1))[:, n.newaxis])
 
-def parse_doc_list(docs, vocab):
+def parse_doc_list(docs, vocab, lem):
     """
     Parse a document into a list of word ids and a list of counts,
     or parse a set of documents into two lists of lists of word ids
     and counts.
 
-    Arguments: 
+    Arguments:
     docs:  List of D documents. Each document must be represented as
            a single string. (Word order is unimportant.) Any
            words not in the vocabulary will be ignored.
     vocab: Dictionary mapping from words to integer ids.
 
-    Returns a pair of lists of lists. 
+    Returns a pair of lists of lists.
 
     The first, wordids, says what vocabulary tokens are present in
     each document. wordids[i][j] gives the jth unique token present in
@@ -57,7 +58,7 @@ def parse_doc_list(docs, vocab):
     present. wordcts[i][j] is the number of times that the token given
     by wordids[i][j] appears in document i.
     """
-    if (type(docs).__name__ == 'str'):
+    if (type(docs).__name__ == 'str' or type(docs).__name__ == 'unicode'):
         temp = list()
         temp.append(docs)
         docs = temp
@@ -67,17 +68,15 @@ def parse_doc_list(docs, vocab):
         return docs
 
     D = len(docs)
-    
+
     wordids = list()
     wordcts = list()
     for d in range(0, D):
-        docs[d] = docs[d].lower()
-        docs[d] = re.sub(r'-', ' ', docs[d])
-        docs[d] = re.sub(r'[^a-z ]', '', docs[d])
-        docs[d] = re.sub(r' +', ' ', docs[d])
         words = string.split(docs[d])
         ddict = dict()
         for word in words:
+            if lem and word not in vocab and len(word) > 2:
+                word = lemmatize.lem(word)
             if (word in vocab):
                 wordtoken = vocab[word]
                 if (not wordtoken in ddict):
@@ -94,7 +93,7 @@ class OnlineLDA:
     """
 
     def __init__(self, vocab, K, D, alpha, eta, tau0, kappa, anchors=[], \
-        preparsed=False):
+        preparsed=False, lem=False):
         """
         Arguments:
         K: Number of topics
@@ -113,6 +112,7 @@ class OnlineLDA:
         Note that if you pass the same set of D documents in every time and
         set kappa=0 this class can also be used to do batch VB.
         """
+
         if preparsed:
             self._W = len(vocab)
             self._vocab = dict()
@@ -134,6 +134,10 @@ class OnlineLDA:
         self._kappa = kappa
         self._updatect = 0
 
+        self.lem = lem
+        if lem:
+            import lemmatize
+
         # Initialize the variational distribution q(beta|lambda)
         self._lambda = 1*n.random.gamma(100., 1./100., (self._K, self._W))
 
@@ -141,12 +145,12 @@ class OnlineLDA:
         self._anchors = anchors
         if self._anchors != []:
             self.reanchor_lambda(init=True)
-        
+
         # back to initializing the variational distribution
         self._Elogbeta = dirichlet_expectation(self._lambda)
         self._expElogbeta = n.exp(self._Elogbeta)
         self._expElogbeta[self._Elogbeta == n.inf] = 0
- 
+
     def reanchor_lambda(self, init=False):
         topic_counter = 0
         for anchor in self._anchors:
@@ -176,12 +180,12 @@ class OnlineLDA:
         """
         # This is to handle the case where someone just hands us a single
         # document, not in a list.
-        if (type(docs).__name__ == 'string'):
+        if (type(docs).__name__ == 'string' or type(docs).__name__=='unicode'):
             temp = list()
             temp.append(docs)
             docs = temp
         if (type(docs).__name__ != 'tuple'):
-            (wordids, wordcts) = parse_doc_list(docs, self._vocab)
+            (wordids, wordcts) = parse_doc_list(docs, self._vocab, self.lem)
             batchD = len(docs)
         else:
             (wordids, wordcts) = docs
@@ -205,7 +209,7 @@ class OnlineLDA:
             Elogthetad = Elogtheta[d, :]
             expElogthetad = expElogtheta[d, :]
             expElogbetad = self._expElogbeta[:, ids]
-            # The optimal phi_{dwk} is proportional to 
+            # The optimal phi_{dwk} is proportional to
             # expElogthetad_k * expElogbetad_w. phinorm is the normalizer.
             phinorm = n.dot(expElogthetad, expElogbetad) + 1e-100
             # Iterate between gamma and phi until convergence
@@ -230,7 +234,7 @@ class OnlineLDA:
 
         # This step finishes computing the sufficient statistics for the
         # M step, so that
-        # sstats[k, w] = \sum_d n_{dw} * phi_{dwk} 
+        # sstats[k, w] = \sum_d n_{dw} * phi_{dwk}
         # = \sum_d n_{dw} * exp{Elogtheta_{dk} + Elogbeta_{kw}} / phinorm_{dw}.
         sstats = sstats * self._expElogbeta
 
@@ -271,15 +275,15 @@ class OnlineLDA:
         # Update lambda based on documents.
         self._lambda = self._lambda * (1-rhot) + \
             rhot * (self._eta + self._D * sstats / len(docs))
-        
+
         if self._anchors != []:
             self.reanchor_lambda()
-        
+
         self._Elogbeta = dirichlet_expectation(self._lambda)
         self._expElogbeta = n.exp(self._Elogbeta)
         self._expElogbeta[self._Elogbeta == n.inf] = 0
         self._updatect += 1
-        
+
         return(gamma, bound)
 
     def approx_bound(self, docs, gamma):
@@ -301,7 +305,7 @@ class OnlineLDA:
             docs = temp
 
         if (type(docs).__name__ != 'tuple'):
-            (wordids, wordcts) = parse_doc_list(docs, self._vocab)
+            (wordids, wordcts) = parse_doc_list(docs, self._vocab, self.lem)
             batchD = len(docs)
         else:
             (wordids, wordcts) = docs
@@ -324,7 +328,7 @@ class OnlineLDA:
                     phinorm[i] = n.log(sum(n.exp(temp - tmax))) + tmax
                 except:
                     # if there's an warning exception raised, it's due to
-                    # archored values not playing nice 
+                    # archored values not playing nice
                     temp[self._Elogbeta[:,ids[i]] == n.inf] = 0
                     tmax = max(temp)
                     phinorm[i] = n.log(sum(n.exp(temp - tmax))) + tmax

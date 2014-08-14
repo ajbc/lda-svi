@@ -29,11 +29,10 @@ class LiveparseDocGen():
                 #print os.path.join(root,filename)
                 self.doclist.append(os.path.join(root,filename))
 
-    def get_random_article(self):
-        id = randint(0, len(self.doclist) - 1)
+    def get_article(self, id):
         docfile = self.doclist[id]
         xml = open(docfile, 'r')
-        soup = BeautifulSoup(xml) 
+        soup = BeautifulSoup(xml)
         xml.close()
 
         # find all the text
@@ -41,21 +40,46 @@ class LiveparseDocGen():
             return self.get_random_article()
         fulltext = soup.find("block", {"class":"full_text"})
         paras = fulltext.findAll("p")
-        all = ' '.join([p.contents[0] for p in paras])
+        alltxt = ' '.join([p.contents[0] for p in paras])
+        alltxt = alltxt.lower()
+        alltxt = re.sub(r'-', ' ', alltxt)
+        alltxt = re.sub(r'[^a-z ]', '', alltxt)
+        alltxt = re.sub(r' +', ' ', alltxt)
 
-        return (all, id)
+        title = soup.find("title")
+        title = title.contents[0] if title else ""
+
+        byline = soup.find("byline")
+        subtitle = byline.contents[0] if byline else ""
+
+        return (alltxt, title, subtitle, docfile)
+
+    def get_random_article(self):
+        id = randint(0, len(self.doclist) - 1)
+        return self.get_article(id)
 
     def get_random_articles(self, n):
         docs = []
-        ids = []
         for i in range(n):
-            (doc, id) = self.get_random_article()
+            (doc, title, subtitle, link) = self.get_random_article()
             docs.append(doc)
-            ids.append(id)
-        return (docs, ids)
+        return docs
 
     def getDocCount(self):
         return len(self.doclist)
+
+    def __iter__(self):
+        self.current = 0
+        return self
+
+    def next(self):
+        if self.current >= len(self.doclist):
+            raise StopIteration
+        else:
+            (all, title, subtitle, docfile) = self.get_article(self.current)
+            link = self.doclist[self.current]
+            self.current += 1
+            return (link, all, title, subtitle)
 
 class PreparseDocGen():
     def __init__(self, filename):
@@ -99,7 +123,7 @@ def get_random_wikipedia_article():
     """
     Downloads a randomly selected Wikipedia article (via
     http://en.wikipedia.org/wiki/Special:Random) and strips out (most
-    of) the formatting, links, etc. 
+    of) the formatting, links, etc.
 
     This function is a bit simpler and less robust than the code that
     was used for the experiments in "Online VB for LDA."

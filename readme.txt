@@ -54,6 +54,7 @@ Files provided:
 * dictnostops.txt: A vocabulary of English words with the stop words removed.
 * readme.txt: This file.
 * COPYING: A copy of the GNU public license version 3.
+TODO: update this list
 
 You will need to have the numpy and scipy packages installed somewhere
 that Python can find them to use these scripts.
@@ -61,10 +62,11 @@ that Python can find them to use these scripts.
 
 Example:
 python onlinewikipedia.py 101
-python printtopics.py dictnostops.txt lambda-100.dat
+python printtopics.py dictnostops.txt lambda-100.dat 10
 
 This would run the algorithm for 101 iterations, and display the
 (expected value under the variational posterior of the) topics fit by
 the algorithm. (Note that the algorithm will not have fully converged
 after 101 iterations---this is just to give an idea of how to use the
-code.)
+code.) The last argument for printtopics is the number of terms to print
+per topic.
