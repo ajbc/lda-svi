@@ -50,7 +50,8 @@ class LiveparseDocGen():
         title = title.contents[0] if title else ""
 
         byline = soup.find("byline")
-        subtitle = byline.contents[0] if byline else ""
+        subtitle = byline.contents[0] if byline and len(byline.contents) != 0 \
+            else ""
 
         return (alltxt, title, subtitle, docfile)
 
