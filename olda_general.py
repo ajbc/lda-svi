@@ -74,10 +74,10 @@ def fit_olda_liveparse(doc_path, vocab_file, outdir, K, batch_size, iterations,\
     iteration = 0
     old_perplexity = 1.0 * sys.maxint
     delta_perplexity = 1.0 * sys.maxint
-    old_perplexities = [old_perplexity] * 10
+    delta_perplexities = [old_perplexity] * 10
     logfile = open(join(outdir, 'log.out'), 'w+')
     while (iterations != 0 and iteration < iterations) or \
-        sum(old_perplexities)/10 > 0.0001: # 0.1% change in sample perplexity
+        sum(delta_perplexities)/10 > 0.0001: # 0.1% change in sample perplexity
 
         iter_start = time.time()
         # Download some articles
@@ -98,8 +98,8 @@ def fit_olda_liveparse(doc_path, vocab_file, outdir, K, batch_size, iterations,\
             (iteration, olda._rhot, perplexity, delta_perplexity * 100)
         logfile.write('%d:  rho_t = %f,  held-out perplexity estimate = %f (%.2f%%)\n' % (iteration, olda._rhot, perplexity, delta_perplexity * 100))
         old_perplexity = perplexity
-        old_perplexities.pop(0)
-        old_perplexities.append(perplexity)
+        delta_perplexities.pop(0)
+        delta_perplexities.append(delta_perplexity)
 
         # Save lambda, the parameters to the variational distributions
         # over topics, and gamma, the parameters to the variational
@@ -146,10 +146,10 @@ def fit_olda_preparse(doc_file, vocab_file, outdir, K, batch_size, iterations,\
     iteration = 0
     old_perplexity = 1.0 * sys.maxint
     delta_perplexity = 1.0 * sys.maxint
-    old_perplexities = [old_perplexity] * 10
+    delta_perplexities = [old_perplexity] * 10
     logfile = open(join(outdir, 'log.out'), 'w+')
     while (iterations != 0 and iteration < iterations) or \
-        sum(old_perplexities)/10 > 0.0001: # 0.1% change in sample perplexity
+        sum(delta_perplexities)/10 > 0.0001: # 0.1% change in sample perplexity
         # Download some articles
         docset = docgen.get_random_articles(batch_size)
         # Give them to online LDA
@@ -163,8 +163,8 @@ def fit_olda_preparse(doc_file, vocab_file, outdir, K, batch_size, iterations,\
             (iteration, olda._rhot, perplexity, delta_perplexity * 100)
         logfile.write('%d:  rho_t = %f,  held-out perplexity estimate = %f (%.2f%%)\n' % (iteration, olda._rhot, perplexity, delta_perplexity * 100))
         old_perplexity = perplexity
-        old_perplexities.pop(0)
-        old_perplexities.append(old_perplexity)
+        delta_perplexities.pop(0)
+        delta_perplexities.append(delta_perplexity)
 
 
         # Save lambda, the parameters to the variational distributions
