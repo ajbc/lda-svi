@@ -66,6 +66,9 @@ if __name__ == '__main__':
     print "doing a final E step over all documents"
     per_time = dict()
     i = 0
+    import time
+    s = time.time()
+    D = 1850000
     for filename, alltxt, title, subtitle in docgen:
         length = 0
         for word in alltxt.split():
@@ -73,6 +76,9 @@ if __name__ == '__main__':
                 length += 1
 
         t = int(filename.split('/')[6])
+
+        if length == 0:
+            continue
 
         db.add_doc(title, subtitle, length, filename, t)
 
@@ -83,7 +89,10 @@ if __name__ == '__main__':
             per_time[t] += ss
         db.add_doc_topics(filename, gamma.tolist()[0])
         if i % 100 == 0:
-            print "doc", i, filename
+            tn = (time() - s) / 360
+            rem = D - i
+            time_rem = D * (ts) / i
+            print "doc %d (%d)" % (i, t), tn, time_rem
         i += 1
 
     # slice up topics by time
