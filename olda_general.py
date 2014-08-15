@@ -77,7 +77,10 @@ def fit_olda_liveparse(doc_path, vocab_file, outdir, K, batch_size, iterations,\
     delta_perplexities = [old_perplexity] * 10
     logfile = open(join(outdir, 'log.out'), 'w+')
     while (iterations != 0 and iteration < iterations) or \
-        sum(delta_perplexities)/10 > 0.0001: # 0.01% change in sample perplexity
+        sum(delta_perplexities)/10 > 0.001: # 0.1% change in sample perplexity
+        if iteration > D/batch_size:
+            print "killing due to iteration count"
+            break
 
         iter_start = time.time()
         # Download some articles
@@ -149,7 +152,7 @@ def fit_olda_preparse(doc_file, vocab_file, outdir, K, batch_size, iterations,\
     delta_perplexities = [old_perplexity] * 10
     logfile = open(join(outdir, 'log.out'), 'w+')
     while (iterations != 0 and iteration < iterations) or \
-        sum(delta_perplexities)/10 > 0.0001: # 0.01% change in sample perplexity
+        sum(delta_perplexities)/10 > 0.001: # 0.1% change in sample perplexity
         # Download some articles
         docset = docgen.get_random_articles(batch_size)
         # Give them to online LDA
