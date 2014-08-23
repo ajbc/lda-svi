@@ -22,8 +22,6 @@ if __name__ == '__main__':
 
     # parse the arguments
     args = parser.parse_args()
-
-    print "imporing tmv db library from", args.tmv_path
     sys.path.append(args.tmv_path)
     import db
 
@@ -68,7 +66,7 @@ if __name__ == '__main__':
     i = 0
     import time
     s = time.time()
-    D = 1850000
+    D = 1850000 #TODO: this should be read in from settings
     for filename, alltxt, title, subtitle in docgen:
         length = 0
         for word in alltxt.split():
@@ -89,10 +87,11 @@ if __name__ == '__main__':
             per_time[t] += ss
         db.add_doc_topics(filename, gamma.tolist()[0])
         if i % 100 == 0:
-            tn = (time() - s) / 360
+            tn = (time.time() - s) / 3600
             rem = D - i
-            time_rem = D * (ts) / i
-            print "doc %d (%d)" % (i, t), tn, time_rem
+            time_rem = rem * (tn) / (i+1)
+            print "doc %d (%d)" % (i, t), tn, str(time_rem)+'h', \
+                str(time_rem/24)+'d'
         i += 1
 
     # slice up topics by time
