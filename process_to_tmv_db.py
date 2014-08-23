@@ -73,6 +73,7 @@ if __name__ == '__main__':
             if word in vocab:
                 length += 1
 
+        # TODO: this should be done less hackishly
         t = int(filename.split('/')[6])
 
         if length == 0:
