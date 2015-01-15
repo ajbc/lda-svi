@@ -120,6 +120,19 @@ class PreparseDocGen():
     def getDocCount(self):
         return len(self.docs)
 
+    def __iter__(self):
+        self.current = 0
+        return self
+
+    def next(self):
+        if self.current >= len(self.docs):
+            raise StopIteration
+        else:
+            doc = self.docs[self.current]
+            self.current += 1
+            return(([doc[0]], [doc[1]]))
+
+
 def get_random_wikipedia_article():
     """
     Downloads a randomly selected Wikipedia article (via

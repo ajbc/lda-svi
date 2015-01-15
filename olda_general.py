@@ -128,7 +128,7 @@ def fit_olda_liveparse(doc_path, vocab_file, outdir, K, batch_size, iterations,\
 
 
 def fit_olda_preparse(doc_file, vocab_file, outdir, K, batch_size, iterations,\
-    verbose_topics, anchors):
+    verbose_topics, anchors, final_pass):
     """
     Analyzes a set of documents using online VB for LDA.
     """
@@ -152,7 +152,8 @@ def fit_olda_preparse(doc_file, vocab_file, outdir, K, batch_size, iterations,\
     delta_perplexities = [old_perplexity] * 10
     logfile = open(join(outdir, 'log.out'), 'w+')
     while (iterations != 0 and iteration < iterations) or \
-        sum(delta_perplexities)/10 > 0.001: # 0.1% change in sample perplexity
+        (iterations == 0 and sum(delta_perplexities)/10 > 0.001): # 0.1% change in sample perplexity
+
         # Download some articles
         docset = docgen.get_random_articles(batch_size)
         # Give them to online LDA
@@ -185,8 +186,24 @@ def fit_olda_preparse(doc_file, vocab_file, outdir, K, batch_size, iterations,\
     logfile.close()
 
     # save final iters
-    numpy.savetxt(join(outdir, 'lambda-%d.dat' % iteration), olda._lambda)
+    numpy.savetxt(join(outdir, 'lambda-final.dat'), olda._lambda)
     numpy.savetxt(join(outdir, 'gamma-%d.dat' % iteration), gamma)
+
+    # do a final pass on all documents
+    if (final_pass):
+        fout = open(join(outdir, "gamma-final.dat"), 'w+')
+        fout.write("doc.lda.id\ttopic.id\tscore\n")
+
+        i = 0
+        for doc in docgen:
+            (gamma, ss) = olda.do_e_step(doc)
+            j = 0
+            for g in gamma.tolist()[0]:
+                if g > 0.051:
+                    fout.write("%d\t%d\t%f\n" % (i,j,g))
+                j += 1
+            i += 1
+        fout.close()
 
 
 if __name__ == '__main__':
@@ -228,6 +245,8 @@ if __name__ == '__main__':
         default='', help = 'output directory')
     parser.add_argument('--tmv-pickle', dest='tmv_pickle', \
         action='store_true', help='save pickles for tmv later')
+    parser.add_argument('--final-pass', dest='final_pass', \
+        default=False, action='store_true', help='do a final pass over all documents')
 
 
     # extensions of LDA
@@ -264,4 +283,4 @@ if __name__ == '__main__':
         # option B
         fit_olda_preparse(args.doc_file, args.vocab, args.outdir, \
             args.K, args.batch_size, args.iterations, args.print_topics, \
-            anchors)
+            anchors, args.final_pass)
