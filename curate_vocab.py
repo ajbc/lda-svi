@@ -17,7 +17,7 @@ parser.add_argument('--out', metavar='out', type=str, \
 parser.add_argument('--min_doc_count', dest='min_doc_count', type=int, \
     default=10, help = 'the minimum # of documents a word must be in')
 parser.add_argument('--max_doc_percent', dest='max_doc_per', type=float, \
-    default=30, help = 'the maximum % of documents a word can be in')
+    default=30, help = 'the maximum percent of documents a word can be in')
 parser.add_argument('--min_tfidf', dest='min_tfidf', type=float, \
     default=np.exp(8), help = 'the minimumm tfidf for a word')
 #TODO add log tfidf option (same as above, but in log form), and make them
