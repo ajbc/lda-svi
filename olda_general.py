@@ -78,7 +78,7 @@ def fit_olda_liveparse(doc_path, vocab_file, outdir, K, batch_size, iterations,\
     logfile = open(join(outdir, 'log.out'), 'w+')
     while (iterations != 0 and iteration < iterations) or \
         sum(delta_perplexities)/10 > 0.001: # 0.1% change in sample perplexity
-        if iteration > D/batch_size:
+        if iteration > D/batch_size and iteration > 10:
             print "killing due to iteration count"
             break
 
@@ -192,17 +192,22 @@ def fit_olda_preparse(doc_file, vocab_file, outdir, K, batch_size, iterations,\
     # do a final pass on all documents
     if (final_pass):
         fout = open(join(outdir, "gamma-final.dat"), 'w+')
-        fout.write("doc.lda.id\ttopic.id\tscore\n")
+        if not full_doc_topics:
+            fout.write("doc.lda.id\ttopic.id\tscore\n")
 
         i = 0
         for doc in docgen:
             (gamma, ss) = olda.do_e_step(doc)
             j = 0
-            for g in gamma.tolist()[0]:
-                if g > 0.051:
-                    fout.write("%d\t%d\t%f\n" % (i,j,g))
-                j += 1
-            i += 1
+            if not full_doc_topics:
+                for g in gamma.tolist()[0]:
+                    if g > 0.051:
+                        fout.write("%d\t%d\t%f\n" % (i,j,g))
+                    j += 1
+                i += 1
+            else:
+                gf = [g in gamma.tolist()[0]]
+                fout.write('\t'.join("%f"*len(gf))+'\n' % gf)
         fout.close()
 
 
@@ -247,6 +252,8 @@ if __name__ == '__main__':
         action='store_true', help='save pickles for tmv later')
     parser.add_argument('--final-pass', dest='final_pass', \
         default=False, action='store_true', help='do a final pass over all documents')
+    parser.add_argument('--full-doc-topics', dest='full_doc_topics', \
+        default=False, action='store_true', help='write out every doc topic value; no thresholding')
 
 
     # extensions of LDA
