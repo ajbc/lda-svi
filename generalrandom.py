@@ -87,6 +87,7 @@ class PreparseDocGen():
         print "initializing preparsed doc gen with file " + filename
         lines = open(filename).readlines()
         self.docs = []
+        self.terms = set()
         for line in lines:
             wordids = []
             wordcts = []
@@ -95,6 +96,7 @@ class PreparseDocGen():
                 tokens = token.split(':')
                 wordids.append(int(tokens[0]))
                 wordcts.append(int(tokens[1]))
+                self.terms.add(int(tokens[0]))
 
             self.docs.append((wordids, wordcts))
         self.D = len(self.docs)
@@ -119,6 +121,9 @@ class PreparseDocGen():
 
     def getDocCount(self):
         return len(self.docs)
+
+    def getTermCount(self):
+        return len(self.terms)
 
     def __iter__(self):
         self.current = 0
