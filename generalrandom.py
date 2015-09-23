@@ -94,7 +94,7 @@ class PreparseDocGen():
 
             for token in line.split(' ')[1:]:
                 tokens = token.split(':')
-                wordids.append(int(tokens[0]))
+                wordids.append(int(tokens[0])-1)
                 wordcts.append(int(tokens[1]))
                 self.terms.add(int(tokens[0]))
 
@@ -112,10 +112,18 @@ class PreparseDocGen():
     def get_random_articles(self, n):
         wordids = []
         wordcts = []
-        for i in range(n):
+        i = 0
+        while (i < n):
             doc = self.docs[randint(0, self.D - 1)]
+
+            # omit short docs from training (to speed things up)
+            if len(doc[0]) < 5:
+                continue
+
             wordids.append(doc[0])
             wordcts.append(doc[1])
+
+            i += 1
 
         return((wordids, wordcts))
 
